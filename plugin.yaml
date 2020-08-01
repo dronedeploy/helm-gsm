@@ -1,0 +1,11 @@
+name: "gsm"
+version: "0.1.0"
+usage: "Secrets loading via Google Secret Manager"
+description: "This plugin provides automatic loading of secrets from Google Secret Manager"
+platformCommand:
+  - os: linux
+    arch: amd64
+    command: "$HELM_PLUGIN_DIR/bin/helm-gsm-linux"
+  - os: darwin
+    arch: amd64
+    command: "$HELM_PLUGIN_DIR/bin/helm-gsm-darwin"
