@@ -2,7 +2,12 @@
 
 set -euf
 
-decrypt_command="$HELM_PLUGIN_DIR/bin/helm-gsm-linux -f"
+os=$(uname)
+binary="helm-gsm-linux"
+if [ "$os" = "Darwin" ]; then
+  binary="helm-gsm-darwin"
+fi
+decrypt_command="$HELM_PLUGIN_DIR/bin/$binary -f"
 
 # https://helm.sh/docs/topics/plugins/#downloader-plugins
 # It's always the 4th parameter
