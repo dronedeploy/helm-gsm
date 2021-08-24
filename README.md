@@ -21,6 +21,11 @@ or
 helm gsm -f path/to/secrets.yaml
 ```
 
+Or alternatively use inline as a protocol handler - eg.
+```
+helm template -f gsm://path/to/secrets.yaml .
+```
+
 The secrets file needs to have a very specific format:
 ```
 secrets:
