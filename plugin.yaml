@@ -9,3 +9,7 @@ platformCommand:
   - os: darwin
     arch: amd64
     command: "$HELM_PLUGIN_DIR/bin/helm-gsm-darwin"
+downloaders:
+  - command: "scripts/protocol-handler.sh"
+    protocols:
+      - "gsm"
