@@ -1,3 +1,4 @@
 *.dec
 *.swp
 .vscode
+helm-gsm

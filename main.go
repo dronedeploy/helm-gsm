@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"os"
@@ -14,93 +13,45 @@ import (
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	flag "github.com/spf13/pflag"
 	secretmanagerpb "google.golang.org/genproto/googleapis/cloud/secretmanager/v1"
+	"gopkg.in/yaml.v3"
 )
 
-func main() {
-	var secretsFile *string = flag.StringP("secretsFile", "f", "secrets.yaml", "Filepath to a yaml file with secrets")
-	flag.Parse()
+const (
+	gsmPrefix = "gsm:"
+)
 
-	parseSecrets(*secretsFile)
-}
-
-type secrets struct {
-	Secrets map[string]string `yaml:"secrets,omitempty"`
-}
-
-func parseSecrets(secretsFile string) {
-	var raw secrets
-	raw_values := raw.loadSecretYaml(secretsFile)
-	if raw_values == nil {
-		return
-	}
-
-	var plaintext secrets
-	plaintext.Secrets = make(map[string]string)
-
-	for k, v := range raw_values.Secrets {
-		if valid, _ := checkValidSecret(v); valid {
-			plaintext.Secrets[k] = base64.StdEncoding.EncodeToString(getSecret(transformStringToCanonicalName(v)))
-		} else {
-			plaintext.Secrets[k] = v
+func parseNode(ctx context.Context, sc *secretmanager.Client, node interface{}) interface{} {
+	switch node.(type) {
+	case map[string]interface{}:
+		for k, v := range node.(map[string]interface{}) {
+			node.(map[string]interface{})[k] = parseNode(ctx, sc, v)
 		}
-	}
-
-	data, err := yaml.Marshal(plaintext)
-	if err != nil {
-		log.Fatalf("error: %v", err)
-	}
-
-	f, err := os.Create("secrets.yaml.dec")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	plaintextFile := secretsFile + ".dec"
-	log.Printf("Writing plaintext secrets to %s.", plaintextFile)
-	err = ioutil.WriteFile(plaintextFile, data, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-	f.Close()
-}
-
-func (s *secrets) loadSecretYaml(secretsFile string) *secrets {
-	if fileExists(secretsFile) {
-		yamlFile, err := ioutil.ReadFile(secretsFile)
-		if err != nil {
-			log.Printf("error loading secrets.yaml #%v", err)
+		return node
+	case string:
+		if strings.HasPrefix(node.(string), gsmPrefix) {
+			checkValidSecret(node.(string))
+			secretPath := strings.TrimPrefix(node.(string), gsmPrefix)
+			node = base64.StdEncoding.EncodeToString(getSecret(ctx, sc, transformStringToCanonicalName(secretPath)))
 		}
-		err = yaml.Unmarshal(yamlFile, s)
-		if err != nil {
-			log.Fatalf("Unmarshal: %v", err)
-		}
-		return s
-	} else {
-		log.Printf("%s does not exist. Skipping decryption", secretsFile)
-		return nil
+		return node
+	default:
+		return node
 	}
 }
 
 func transformStringToCanonicalName(raw string) string {
-	s := strings.Split(raw[4:], "/")
+	s := strings.Split(raw, "/")
 	return fmt.Sprintf("projects/%s/secrets/%s/versions/%s", s[0], s[1], s[2])
 }
 
-func getSecret(s string) []byte {
-	// Create the client.
-	ctx := context.Background()
-	client, err := secretmanager.NewClient(ctx)
-	if err != nil {
-		log.Fatalf("failed to setup client: %v", err)
-	}
-
+func getSecret(ctx context.Context, sc *secretmanager.Client, s string) []byte {
 	// Build the request.
 	accessRequest := &secretmanagerpb.AccessSecretVersionRequest{
 		Name: s,
 	}
 
 	// Call the API.
-	result, err := client.AccessSecretVersion(ctx, accessRequest)
+	result, err := sc.AccessSecretVersion(ctx, accessRequest)
 	if err != nil {
 		log.Fatalf("failed to access secret version: %v", err)
 	}
@@ -108,15 +59,14 @@ func getSecret(s string) []byte {
 	return result.Payload.Data
 }
 
-func checkValidSecret(s string) (bool, string) {
+func checkValidSecret(s string) bool {
 	regex_string := `^gsm:[a-z][a-z0-9-]{4,28}[a-z0-9]\/[a-zA-Z0-9_-]+\/[1-9][0-9]*$`
 	matched, err := regexp.Match(regex_string, []byte(s))
 	if err != nil {
 		log.Fatalf("error matching regex")
 	}
-	msg := ""
 	if !matched {
-		msg = "Secret did not match required format.\n" +
+		log.Fatal("Secret did not match required format.\n" +
 			"\n" +
 			"Must be in the form 'gsm:project_id/secret_name/version'.\n" +
 			"project_id: 'The unique, user-assigned ID of the Project. It must be 6 to 30 lowercase letters, digits, or hyphens. It must start with a letter. Trailing hyphens are prohibited.'\n" +
@@ -125,10 +75,9 @@ func checkValidSecret(s string) (bool, string) {
 			"\n" +
 			"example: 'gsm:project-id/secret_name/1'\n" +
 			"regex: '" + regex_string + "'\n" +
-			"\n"
+			"\n")
 	}
-
-	return matched, msg
+	return matched
 }
 
 // fileExists checks if a file exists and is not a directory before we
@@ -139,4 +88,53 @@ func fileExists(filename string) bool {
 		return false
 	}
 	return !info.IsDir()
+}
+
+func main() {
+	ctx := context.Background()
+
+	// Create the secretmanager client once and reuse it throughout
+	sc, err := secretmanager.NewClient(ctx)
+	if err != nil {
+		log.Fatalf("Failed to setup SecretManager client: %v", err)
+	}
+
+	// Grab the input filename, abort if it doesn't exist or is a directory.
+	var inputFilename string
+	flag.StringVarP(&inputFilename, "secretsFile", "f", "secrets.yaml", "Filepath to a yaml file with secrets")
+	flag.Parse()
+
+	fmt.Println(inputFilename)
+	if !fileExists(inputFilename) {
+		log.Fatalf("input file %v does not exist or is a directory\n", inputFilename)
+	}
+
+	// Unmarshal the input file
+	inputFile, err := ioutil.ReadFile(inputFilename)
+	if err != nil {
+		log.Printf("failed to read input file %v ", err)
+	}
+	data := make(map[interface{}]interface{})
+	err = yaml.Unmarshal(inputFile, &data)
+	if err != nil {
+		log.Fatalf("failed unmarshalling input data: %v", err)
+	}
+
+	// Loop over the nodes of the YAML parsing them recursively
+	for k, v := range data {
+		data[k] = parseNode(ctx, sc, v)
+	}
+
+	// Marshal the parsed data back to YAML and write to the output file
+	outputYAML, err := yaml.Marshal(data)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	outputFilename := inputFilename + ".dec"
+	log.Printf("Writing plaintext secrets to %s.", outputFilename)
+	err = ioutil.WriteFile(outputFilename, outputYAML, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
