@@ -1,5 +1,5 @@
 name: "gsm"
-version: "0.3.0"
+version: "0.4.0"
 usage: "Secrets loading via Google Secret Manager"
 description: "This plugin provides automatic loading of secrets from Google Secret Manager"
 platformCommand:
@@ -13,3 +13,6 @@ downloaders:
   - command: "scripts/protocol-handler.sh"
     protocols:
       - "gsm"
+  - command: "scripts/protocol-handler-b64.sh"
+    protocols:
+      - "gsmb64"

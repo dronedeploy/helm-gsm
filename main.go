@@ -20,6 +20,10 @@ const (
 	gsmPrefix = "gsm:"
 )
 
+var (
+	b64Encode = false
+)
+
 func parseNode(ctx context.Context, sc *secretmanager.Client, node interface{}) interface{} {
 	switch node.(type) {
 	case map[string]interface{}:
@@ -31,7 +35,11 @@ func parseNode(ctx context.Context, sc *secretmanager.Client, node interface{}) 
 		if strings.HasPrefix(node.(string), gsmPrefix) {
 			checkValidSecret(node.(string))
 			secretPath := strings.TrimPrefix(node.(string), gsmPrefix)
-			node = base64.StdEncoding.EncodeToString(getSecret(ctx, sc, transformStringToCanonicalName(secretPath)))
+			if b64Encode == true {
+				node = base64.StdEncoding.EncodeToString(getSecret(ctx, sc, transformStringToCanonicalName(secretPath)))
+				return node
+			}
+			node = string(getSecret(ctx, sc, transformStringToCanonicalName(secretPath)))
 		}
 		return node
 	default:
@@ -102,6 +110,7 @@ func main() {
 	// Grab the input filename, abort if it doesn't exist or is a directory.
 	var inputFilename string
 	flag.StringVarP(&inputFilename, "secretsFile", "f", "secrets.yaml", "Filepath to a yaml file with secrets")
+	flag.BoolVarP(&b64Encode, "b64Encode", "b", false, "base64 encode values in the output .dec file")
 	flag.Parse()
 
 	fmt.Println(inputFilename)
