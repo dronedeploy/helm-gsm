@@ -9,7 +9,7 @@ No dependencies, but only supports darwin_amd64 and linux_amd64 because that's a
 ## Installation
 
 ```
-helm plugin install https://github.com/dronedeploy/helm-gsm.git --version v0.2.0
+helm plugin install https://github.com/dronedeploy/helm-gsm.git --version v0.4.0
 ```
 
 ## Usage
