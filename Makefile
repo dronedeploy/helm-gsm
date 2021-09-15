@@ -1,5 +1,10 @@
-bin/helm-gsm-darwin:
+.PHONY: clean macos linux
+
+macos:
 	GOOS=darwin GOARCH=amd64 go build -o bin/helm-gsm-darwin
 
-bin/helm-gsm-linux:
+linux:
 	GOOS=linux GOARCH=amd64 go build -o bin/helm-gsm-linux
+
+clean:
+	rm bin/*

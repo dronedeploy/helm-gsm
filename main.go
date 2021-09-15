@@ -68,7 +68,7 @@ func getSecret(ctx context.Context, sc *secretmanager.Client, s string) []byte {
 }
 
 func checkValidSecret(s string) bool {
-	regex_string := `^gsm:[a-z][a-z0-9-]{4,28}[a-z0-9]\/[a-zA-Z0-9_-]+\/[1-9][0-9]*$`
+	regex_string := `^gsm:[a-z][a-z0-9-]{4,28}[a-z0-9]\/[a-zA-Z0-9_-]+\/(latest|[1-9][0-9]*)$`
 	matched, err := regexp.Match(regex_string, []byte(s))
 	if err != nil {
 		log.Fatalf("error matching regex")
