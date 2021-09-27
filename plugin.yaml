@@ -1,5 +1,5 @@
 name: "gsm"
-version: "0.4.1"
+version: "0.4.2"
 usage: "Secrets loading via Google Secret Manager"
 description: "This plugin provides automatic loading of secrets from Google Secret Manager"
 platformCommand:

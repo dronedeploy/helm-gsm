@@ -31,6 +31,11 @@ func parseNode(ctx context.Context, sc *secretmanager.Client, node interface{}) 
 			node.(map[string]interface{})[k] = parseNode(ctx, sc, v)
 		}
 		return node
+	case []interface{}:
+		for i := range node.([]interface{}) {
+			node.([]interface{})[i] = parseNode(ctx, sc, node.([]interface{})[i])
+		}
+		return node
 	case string:
 		if strings.HasPrefix(node.(string), gsmPrefix) {
 			checkValidSecret(node.(string))
